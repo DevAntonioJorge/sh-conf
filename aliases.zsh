@@ -1,0 +1,12 @@
+#Aliases
+alias cat="bat"
+alias l="eza --icons"
+alias ll="eza -lah --icons --git"
+alias la="eza -la --icons"
+alias tree="eza --tree --icons"
+alias reset="clear && exec zsh"
+alias gs="git status"
+alias gd="git diff"
+alias gc="git commit"
+alias gco="git checkout"
+alias ga="git add"
