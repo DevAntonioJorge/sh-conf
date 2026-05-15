@@ -9,6 +9,8 @@ export PATH=$HOME/.cargo/bin:$PATH
 export NVM_DIR="$HOME/.nvm"
 export PNPM_HOME="$HOME/.local/share/pnpm"
 export PATH="$PNPM_HOME:$PATH"
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
 
 plugins=(git zoxide starship)
 
@@ -22,3 +24,6 @@ eval "$(atuin init zsh)"
 eval "$(starship init zsh)"
 eval "$(tv init zsh)"
 eval "$(/home/aj/.local/bin/mise activate zsh)"
+
+# bun completions
+[ -s "/home/aj/.bun/_bun" ] && source "/home/aj/.bun/_bun"
