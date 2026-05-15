@@ -1,6 +1,6 @@
 #Aliases
 alias cat="bat"
-alias l="eza --icons"
+alias ls="eza --icons"
 alias ll="eza -lah --icons --git"
 alias la="eza -la --icons"
 alias tree="eza --tree --icons"
