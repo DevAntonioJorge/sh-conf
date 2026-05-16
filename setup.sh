@@ -125,6 +125,20 @@ fi
 # ---------------------------------------------------------------------------
 step "Deploying zsh configuration"
 ZDOTDIR_TARGET="${ZDOTDIR:-$HOME/.config/zsh}"
+mkdir -p "$ZDOTDIR_TARGET"
+
+REPO="DevAntonioJorge/sh-conf"
+BRANCH="main"
+RAW="https://raw.githubusercontent.com/$REPO/$BRANCH"
+
+for f in .zshrc aliases.zsh zoxide.zsh; do
+  if [[ ! -f "$ZDOTDIR_TARGET/$f" ]]; then
+    curl -fsSL "$RAW/$f" -o "$ZDOTDIR_TARGET/$f"
+    info "Downloaded $f"
+  else
+    info "$f already exists, skipping"
+  fi
+done
 
 # Ensure ZDOTDIR is set in .zshenv so zsh picks it up on startup
 if [[ ! -f "$HOME/.zshenv" ]] || ! grep -q "ZDOTDIR" "$HOME/.zshenv" 2>/dev/null; then
@@ -139,6 +153,7 @@ fi
 # ---------------------------------------------------------------------------
 step "Verifying PATH exports"
 ZSHRC="$ZDOTDIR_TARGET/.zshrc"
+touch "$ZSHRC"
 for p in \
   'export PATH=$HOME/.opencode/bin:$PATH' \
   'export PATH=$HOME/.local/bin:$PATH' \
