@@ -54,7 +54,7 @@ fi
 # ---------------------------------------------------------------------------
 step "Atuin"
 if [[ ! -d "$HOME/.atuin" ]]; then
-  curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
+  curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | bash
 else
   info "Atuin already installed"
 fi
