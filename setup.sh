@@ -86,6 +86,17 @@ fi
 # 8. Bun
 # ---------------------------------------------------------------------------
 step "Bun"
+if (( ! ${+commands[unzip]} )); then
+  if (( ${+commands[apt-get]} )); then
+    sudo apt-get install -y unzip
+  elif (( ${+commands[dnf]} )); then
+    sudo dnf install -y unzip
+  elif (( ${+commands[pacman]} )); then
+    sudo pacman -S --noconfirm unzip
+  elif (( ${+commands[brew]} )); then
+    brew install unzip
+  fi
+fi
 if [[ ! -d "$HOME/.bun" ]]; then
   curl -fsSL https://bun.sh/install | bash
   export BUN_INSTALL="$HOME/.bun"
