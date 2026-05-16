@@ -213,6 +213,13 @@ done
 # 12. Set zsh as default shell
 # ---------------------------------------------------------------------------
 step "Setting zsh as default shell"
+if ! command -v zsh &>/dev/null; then
+  brew install zsh
+  info "zsh installed"
+else
+  info "zsh already installed"
+fi
+
 ZSH_PATH="$(command -v zsh)"
 CURRENT_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
 if [[ "$CURRENT_SHELL" != "$ZSH_PATH" ]]; then
