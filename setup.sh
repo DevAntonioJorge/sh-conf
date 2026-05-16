@@ -88,9 +88,46 @@ fi
 # ---------------------------------------------------------------------------
 step "Atuin"
 if [[ ! -d "$HOME/.atuin" ]]; then
-  curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | bash
+  curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh -s -- --non-interactive
+  info "Atuin installed"
 else
   info "Atuin already installed"
+fi
+
+# Configure Atuin (daemon + autostart)
+ATUIN_CONFIG_DIR="$HOME/.config/atuin"
+ATUIN_CONFIG="$ATUIN_CONFIG_DIR/config.toml"
+mkdir -p "$ATUIN_CONFIG_DIR"
+if [[ ! -f "$ATUIN_CONFIG" ]]; then
+  cat > "$ATUIN_CONFIG" <<'EOF'
+auto_sync = true
+update_check = true
+search_mode = "fuzzy"
+filter_mode = "global"
+style = "compact"
+inline_height = 40
+show_preview = true
+enter_accept = true
+keymap_mode = "emacs"
+
+[daemon]
+enabled = true
+autostart = true
+sync_frequency = 300
+
+[search]
+filters = ["global", "host", "session", "directory"]
+
+[stats]
+common_subcommands = [
+  "apt", "cargo", "composer", "dnf", "docker", "git", "go",
+  "kubectl", "nix", "npm", "pnpm", "podman", "systemctl", "tmux", "yarn"
+]
+common_prefix = ["sudo"]
+EOF
+  info "Atuin config created with daemon enabled"
+else
+  info "Atuin config already exists"
 fi
 
 # ---------------------------------------------------------------------------
@@ -173,7 +210,20 @@ for p in "${PATH_EXPORTS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 12. Summary
+# 12. Set zsh as default shell
+# ---------------------------------------------------------------------------
+step "Setting zsh as default shell"
+ZSH_PATH="$(command -v zsh)"
+CURRENT_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
+if [[ "$CURRENT_SHELL" != "$ZSH_PATH" ]]; then
+  chsh -s "$ZSH_PATH"
+  info "Default shell changed to $ZSH_PATH"
+else
+  info "zsh is already the default shell"
+fi
+
+# ---------------------------------------------------------------------------
+# 13. Summary
 # ---------------------------------------------------------------------------
 step "Done!"
 echo ""
