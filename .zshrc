@@ -1,7 +1,14 @@
 export EDITOR=nvim
 
-autoload -Uz compinit
-compinit
+
+source $HOME/.local/share/zinit/zinit.git/zinit.zsh
+
+zinit light zsh-users/zsh-autosuggestions
+zinit light zsh-users/zsh-syntax-highlighting
+zinit light zsh-users/zsh-completions
+
+autoload -Uz compinit && compinit
+zinit cdreplay -q
 
 export PATH=$HOME/.opencode/bin:$PATH
 export PATH=$HOME/.local/bin:$PATH
@@ -27,3 +34,11 @@ eval "$(/home/aj/.local/bin/mise activate zsh)"
 
 # bun completions
 [ -s "/home/aj/.bun/_bun" ] && source "/home/aj/.bun/_bun"
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv zsh)"
+
+
+zinit light-mode for \
+    zdharma-continuum/zinit-annex-as-monitor \
+    zdharma-continuum/zinit-annex-bin-gem-node \
+    zdharma-continuum/zinit-annex-patch-dl \
+    zdharma-continuum/zinit-annex-rust
