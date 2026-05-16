@@ -1,39 +1,73 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
 
-set -e
+set -euo pipefail
 
 # =============================================================================
 # Zsh Environment Setup Script
 # =============================================================================
 
-info()  { print -P "%F{green}✓%f %B$1%f" }
-warn()  { print -P "%F{yellow}!%f %B$1%f" }
-err()   { print -P "%F{red}✗%f %B$1%f" >&2; exit 1 }
-step()  { print -P "\n%B==> %f%F{cyan}$1%f" }
+ZDOTDIR_TARGET="${ZDOTDIR:-$HOME/.config/zsh}"
+REPO="DevAntonioJorge/sh-conf"
+BRANCH="main"
+RAW="https://raw.githubusercontent.com/${REPO}/${BRANCH}"
+
+info()  { echo -e "\033[1;32m✓\033[0m \033[1m$1\033[0m"; }
+warn()  { echo -e "\033[1;33m!\033[0m \033[1m$1\033[0m"; }
+err()   { echo -e "\033[1;31m✗\033[0m \033[1m$1\033[0m" >&2; exit 1; }
+step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
+
+# ---------------------------------------------------------------------------
+# 0. Deploy zsh config files FIRST (before ZDOTDIR is set in .zshenv)
+# ---------------------------------------------------------------------------
+step "Deploying zsh configuration"
+mkdir -p "$ZDOTDIR_TARGET"
+
+CONFIG_FILES=(.zshrc aliases.zsh zoxide.zsh)
+for f in "${CONFIG_FILES[@]}"; do
+  if [[ ! -f "$ZDOTDIR_TARGET/$f" ]]; then
+    curl -fsSL "$RAW/$f" -o "$ZDOTDIR_TARGET/$f"
+    info "Downloaded $f"
+  else
+    info "$f already exists, keeping your version"
+  fi
+done
+
+# Ensure ZDOTDIR is set in .zshenv so zsh picks it up on startup
+if [[ ! -f "$HOME/.zshenv" ]] || ! grep -q "ZDOTDIR" "$HOME/.zshenv" 2>/dev/null; then
+  echo "export ZDOTDIR=\"$ZDOTDIR_TARGET\"" >> "$HOME/.zshenv"
+  info "ZDOTDIR set in ~/.zshenv"
+else
+  info "ZDOTDIR already set in ~/.zshenv"
+fi
 
 # ---------------------------------------------------------------------------
 # 1. Homebrew (Linuxbrew)
 # ---------------------------------------------------------------------------
 step "Homebrew"
-if (( ! ${+commands[brew]} )); then
-  print "Installing Homebrew..."
+if ! command -v brew &>/dev/null; then
+  echo "Installing Homebrew..."
   NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
 else
   info "Homebrew already installed"
 fi
 
+# Ensure brew is in PATH
+if [[ -f /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
+
 # ---------------------------------------------------------------------------
-# 2. Core utilities (bat, eza, zoxide, fzf, fd, ripgrep)
+# 2. Core utilities (bat, eza, zoxide, fzf, fd, ripgrep, unzip)
 # ---------------------------------------------------------------------------
 step "Core utilities"
-brew install bat eza zoxide fzf fd ripgrep 2>/dev/null || info "Some tools may already be installed"
+brew install bat eza zoxide fzf fd ripgrep unzip 2>/dev/null || info "Some tools may already be installed"
 
 # ---------------------------------------------------------------------------
 # 3. Starship prompt
 # ---------------------------------------------------------------------------
 step "Starship"
-if (( ! ${+commands[starship]} )); then
+if ! command -v starship &>/dev/null; then
   brew install starship
 else
   info "Starship already installed"
@@ -43,7 +77,7 @@ fi
 # 4. Mise (tool version manager)
 # ---------------------------------------------------------------------------
 step "Mise"
-if (( ! ${+commands[mise]} )); then
+if ! command -v mise &>/dev/null; then
   brew install mise
 else
   info "Mise already installed"
@@ -75,7 +109,7 @@ fi
 # 7. pnpm
 # ---------------------------------------------------------------------------
 step "pnpm"
-if (( ! ${+commands[pnpm]} )); then
+if ! command -v pnpm &>/dev/null; then
   corepack enable
   corepack prepare pnpm@latest --activate
 else
@@ -86,9 +120,6 @@ fi
 # 8. Bun
 # ---------------------------------------------------------------------------
 step "Bun"
-if (( ! ${+commands[unzip]} )); then
-  brew install unzip
-fi
 if [[ ! -d "$HOME/.bun" ]]; then
   curl -fsSL https://bun.sh/install | bash
   export BUN_INSTALL="$HOME/.bun"
@@ -101,7 +132,7 @@ fi
 # 9. Television (tv) — fuzzy finder
 # ---------------------------------------------------------------------------
 step "Television (tv)"
-if (( ! ${+commands[tv]} )); then
+if ! command -v tv &>/dev/null; then
   brew install television
 else
   info "Television already installed"
@@ -121,71 +152,43 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 11. Deploy zsh config files
-# ---------------------------------------------------------------------------
-step "Deploying zsh configuration"
-ZDOTDIR_TARGET="${ZDOTDIR:-$HOME/.config/zsh}"
-mkdir -p "$ZDOTDIR_TARGET"
-
-REPO="DevAntonioJorge/sh-conf"
-BRANCH="main"
-RAW="https://raw.githubusercontent.com/$REPO/$BRANCH"
-
-for f in .zshrc aliases.zsh zoxide.zsh; do
-  if [[ ! -f "$ZDOTDIR_TARGET/$f" ]]; then
-    curl -fsSL "$RAW/$f" -o "$ZDOTDIR_TARGET/$f"
-    info "Downloaded $f"
-  else
-    info "$f already exists, skipping"
-  fi
-done
-
-# Ensure ZDOTDIR is set in .zshenv so zsh picks it up on startup
-if [[ ! -f "$HOME/.zshenv" ]] || ! grep -q "ZDOTDIR" "$HOME/.zshenv" 2>/dev/null; then
-  print "export ZDOTDIR=\"$ZDOTDIR_TARGET\"" >> "$HOME/.zshenv"
-  info "ZDOTDIR set in ~/.zshenv"
-else
-  info "ZDOTDIR already set in ~/.zshenv"
-fi
-
-# ---------------------------------------------------------------------------
-# 12. Add PATH exports to .zshrc if not present
+# 11. Add PATH exports to .zshrc if not present
 # ---------------------------------------------------------------------------
 step "Verifying PATH exports"
 ZSHRC="$ZDOTDIR_TARGET/.zshrc"
-touch "$ZSHRC"
-for p in \
-  'export PATH=$HOME/.opencode/bin:$PATH' \
-  'export PATH=$HOME/.local/bin:$PATH' \
-  'export PATH=$HOME/.cargo/bin:$PATH' \
-  'export PNPM_HOME="$HOME/.local/share/pnpm"' \
-  'export PATH="$PNPM_HOME:$PATH"' \
-  'export BUN_INSTALL="$HOME/.bun"' \
+PATH_EXPORTS=(
+  'export PATH=$HOME/.opencode/bin:$PATH'
+  'export PATH=$HOME/.local/bin:$PATH'
+  'export PATH=$HOME/.cargo/bin:$PATH'
+  'export PNPM_HOME="$HOME/.local/share/pnpm"'
+  'export PATH="$PNPM_HOME:$PATH"'
+  'export BUN_INSTALL="$HOME/.bun"'
   'export PATH="$BUN_INSTALL/bin:$PATH"'
-do
+)
+for p in "${PATH_EXPORTS[@]}"; do
   if ! grep -qF "$p" "$ZSHRC" 2>/dev/null; then
-    print "$p" >> "$ZSHRC"
+    echo "$p" >> "$ZSHRC"
     info "Added: $p"
   fi
 done
 
 # ---------------------------------------------------------------------------
-# 13. Summary
+# 12. Summary
 # ---------------------------------------------------------------------------
 step "Done!"
-print ""
-print "Installed:"
-print "  • Homebrew"
-print "  • bat, eza, zoxide, fzf, fd, ripgrep"
-print "  • Starship prompt"
-print "  • Mise"
-print "  • Atuin"
-print "  • NVM"
-print "  • pnpm"
-print "  • Bun"
-print "  • Television (tv)"
-print "  • Zinit + plugins"
-print ""
-print "Config directory: $ZDOTDIR_TARGET"
-print ""
-print "Restart your shell with:  exec zsh"
+echo ""
+echo "Installed:"
+echo "  • Homebrew"
+echo "  • bat, eza, zoxide, fzf, fd, ripgrep"
+echo "  • Starship prompt"
+echo "  • Mise"
+echo "  • Atuin"
+echo "  • NVM"
+echo "  • pnpm"
+echo "  • Bun"
+echo "  • Television (tv)"
+echo "  • Zinit + plugins"
+echo ""
+echo "Config directory: $ZDOTDIR_TARGET"
+echo ""
+echo "Restart your shell with:  exec zsh"
