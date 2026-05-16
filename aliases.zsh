@@ -1,9 +1,6 @@
 #Aliases
-alias cat="bat"
-alias ls="eza --icons"
-alias ll="eza -lah --icons --git"
-alias la="eza -la --icons"
-alias tree="eza --tree --icons"
+command -v bat &>/dev/null && alias cat="bat"
+command -v eza &>/dev/null && { alias ls="eza --icons"; alias ll="eza -lah --icons --git"; alias la="eza -la --icons"; alias tree="eza --tree --icons"; }
 alias reset="clear && exec zsh"
 alias gs="git status"
 alias gd="git diff"
