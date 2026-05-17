@@ -64,7 +64,7 @@ info "Detected distro: $DISTRO"
 step "Checking for tar"
 if ! command -v tar &>/dev/null; then
   info "tar not found, installing..."
-  pkg_install tar || err "Failed to install tar"
+  pkg_install tar || true
   command -v tar &>/dev/null || err "tar is required but could not be installed"
 else
   info "tar is already installed"
