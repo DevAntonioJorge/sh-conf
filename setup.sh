@@ -17,6 +17,48 @@ err()   { echo -e "\033[1;31m✗\033[0m \033[1m$1\033[0m" >&2; exit 1; }
 step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
 
 # ---------------------------------------------------------------------------
+# Distro detection & package manager abstraction
+# ---------------------------------------------------------------------------
+PKG_MGR=""
+DISTRO=""
+
+detect_distro() {
+  if [[ -f /etc/os-release ]]; then
+    source /etc/os-release
+    case "$ID" in
+      opensuse-tumbleweed|opensuse) DISTRO="opensuse"; PKG_MGR="sudo zypper install -y" ;;
+      arch)                         DISTRO="arch";     PKG_MGR="sudo pacman -S --noconfirm" ;;
+      fedora)                       DISTRO="fedora";   PKG_MGR="sudo dnf install -y" ;;
+      *)                            DISTRO="generic";  PKG_MGR="" ;;
+    esac
+  else
+    DISTRO="generic"; PKG_MGR=""
+  fi
+}
+
+pkg_install() {
+  if [[ "$DISTRO" == "generic" ]]; then
+    brew install "$@" 2>/dev/null || warn "Some packages may not have installed"
+  else
+    $PKG_MGR "$@"
+  fi
+}
+
+is_installed() {
+  if [[ "$DISTRO" == "generic" ]]; then
+    command -v "$1" &>/dev/null
+  else
+    case "$DISTRO" in
+      opensuse|fedora) rpm -q "$1" &>/dev/null ;;
+      arch)            pacman -Q "$1" &>/dev/null ;;
+    esac
+  fi
+}
+
+detect_distro
+info "Detected distro: $DISTRO"
+
+# ---------------------------------------------------------------------------
 # 0. Deploy zsh config files FIRST (before ZDOTDIR is set in .zshenv)
 # ---------------------------------------------------------------------------
 step "Deploying zsh configuration"
@@ -41,34 +83,42 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 1. Homebrew (Linuxbrew)
+# 1. Homebrew (Linuxbrew) — only on generic distros
 # ---------------------------------------------------------------------------
 step "Homebrew"
-if ! command -v brew &>/dev/null; then
-  echo "Installing Homebrew..."
-  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-else
-  info "Homebrew already installed"
-fi
+if [[ "$DISTRO" == "generic" ]]; then
+  if ! command -v brew &>/dev/null; then
+    echo "Installing Homebrew..."
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  else
+    info "Homebrew already installed"
+  fi
 
-# Ensure brew is in PATH
-if [[ -f /home/linuxbrew/.linuxbrew/bin/brew ]]; then
-  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  if [[ -f /home/linuxbrew/.linuxbrew/bin/brew ]]; then
+    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+  fi
+else
+  info "Using native package manager ($DISTRO), skipping Homebrew"
 fi
 
 # ---------------------------------------------------------------------------
 # 2. Core utilities (bat, eza, zoxide, fzf, fd, ripgrep, unzip)
 # ---------------------------------------------------------------------------
 step "Core utilities"
-brew install bat eza zoxide fzf fd ripgrep unzip 2>/dev/null || info "Some tools may already be installed"
+pkg_install bat eza zoxide fzf fd ripgrep unzip
 
 # ---------------------------------------------------------------------------
 # 3. Starship prompt
 # ---------------------------------------------------------------------------
 step "Starship"
 if ! command -v starship &>/dev/null; then
-  brew install starship
+  if [[ "$DISTRO" == "opensuse" ]]; then
+    curl -sS https://starship.rs/install.sh | sh -s -- --yes
+  else
+    pkg_install starship
+  fi
+  info "Starship installed"
 else
   info "Starship already installed"
 fi
@@ -78,7 +128,12 @@ fi
 # ---------------------------------------------------------------------------
 step "Mise"
 if ! command -v mise &>/dev/null; then
-  brew install mise
+  if [[ "$DISTRO" == "opensuse" ]]; then
+    curl https://mise.run | sh
+  else
+    pkg_install mise
+  fi
+  info "Mise installed"
 else
   info "Mise already installed"
 fi
@@ -166,11 +221,17 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 9. Television (tv) — fuzzy finder
+# 9. Television (tv) — fuzzy finder (via cargo on all distros)
 # ---------------------------------------------------------------------------
 step "Television (tv)"
 if ! command -v tv &>/dev/null; then
-  brew install television
+  if ! command -v cargo &>/dev/null; then
+    warn "cargo not found, installing Rust toolchain first..."
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+  fi
+  cargo install television
+  info "Television installed via cargo"
 else
   info "Television already installed"
 fi
@@ -210,42 +271,53 @@ for p in "${PATH_EXPORTS[@]}"; do
 done
 
 # ---------------------------------------------------------------------------
-# 12. Set zsh as default shell
+# 12. Install zsh (chsh removed — run manually if needed)
 # ---------------------------------------------------------------------------
-step "Setting zsh as default shell"
+step "Installing zsh"
 if ! command -v zsh &>/dev/null; then
-  brew install zsh
+  pkg_install zsh
   info "zsh installed"
 else
   info "zsh already installed"
 fi
 
-ZSH_PATH="$(command -v zsh)"
-CURRENT_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
-if [[ "$CURRENT_SHELL" != "$ZSH_PATH" ]]; then
-  chsh -s "$ZSH_PATH"
-  info "Default shell changed to $ZSH_PATH"
-else
-  info "zsh is already the default shell"
-fi
-
 # ---------------------------------------------------------------------------
 # 13. Summary
 # ---------------------------------------------------------------------------
+ZSH_PATH="$(command -v zsh 2>/dev/null || echo "not installed")"
+CURRENT_SHELL="$(getent passwd "$USER" | cut -d: -f7)"
+
 step "Done!"
 echo ""
+echo "Detected distro: $DISTRO"
+echo ""
 echo "Installed:"
-echo "  • Homebrew"
-echo "  • bat, eza, zoxide, fzf, fd, ripgrep"
+echo "  • Core utilities: bat, eza, zoxide, fzf, fd, ripgrep"
 echo "  • Starship prompt"
 echo "  • Mise"
 echo "  • Atuin"
 echo "  • NVM"
 echo "  • pnpm"
 echo "  • Bun"
-echo "  • Television (tv)"
+echo "  • Television (tv) — via cargo"
 echo "  • Zinit + plugins"
+if [[ "$DISTRO" != "generic" ]]; then
+  echo "  • zsh (via native package manager)"
+else
+  echo "  • Homebrew"
+  echo "  • zsh (via brew)"
+fi
 echo ""
 echo "Config directory: $ZDOTDIR_TARGET"
 echo ""
+if [[ "$CURRENT_SHELL" != "$ZSH_PATH" ]]; then
+  echo "To set zsh as default shell, run manually:"
+  echo "  chsh -s $(which zsh 2>/dev/null || echo '$ZSH_PATH')"
+  echo ""
+fi
+if [[ "$DISTRO" == "opensuse" || "$DISTRO" == "fedora" ]]; then
+  echo "Note: Ruby is provided by your system package manager."
+  echo "  Install with: sudo zypper/dnf install ruby ruby-devel"
+  echo ""
+fi
 echo "Restart your shell with:  exec zsh"
