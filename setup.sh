@@ -59,6 +59,18 @@ detect_distro
 info "Detected distro: $DISTRO"
 
 # ---------------------------------------------------------------------------
+# Check required archive utility
+# ---------------------------------------------------------------------------
+step "Checking for tar"
+if ! command -v tar &>/dev/null; then
+  info "tar not found, installing..."
+  pkg_install tar || err "Failed to install tar"
+  command -v tar &>/dev/null || err "tar is required but could not be installed"
+else
+  info "tar is already installed"
+fi
+
+# ---------------------------------------------------------------------------
 # 0. Deploy zsh config files FIRST (before ZDOTDIR is set in .zshenv)
 # ---------------------------------------------------------------------------
 step "Deploying zsh configuration"
