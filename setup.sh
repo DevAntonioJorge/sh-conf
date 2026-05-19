@@ -122,6 +122,24 @@ step "Core utilities"
 pkg_install bat eza zoxide fzf fd ripgrep unzip
 
 # ---------------------------------------------------------------------------
+# 2b. Go (golang)
+# ---------------------------------------------------------------------------
+step "Go"
+if ! command -v go &>/dev/null; then
+  info "Go not found, attempting to install via package manager"
+  if ! pkg_install go && ! pkg_install golang; then
+    warn "Could not install Go via package manager. Please install Go manually from https://go.dev/dl/"
+  else
+    info "Go installed"
+  fi
+else
+  info "Go already installed"
+fi
+
+# Ensure GOPATH directory exists
+mkdir -p "$HOME/.go"
+
+# ---------------------------------------------------------------------------
 # 3. Starship prompt
 # ---------------------------------------------------------------------------
 step "Starship"
@@ -275,6 +293,8 @@ PATH_EXPORTS=(
   'export PATH="$PNPM_HOME:$PATH"'
   'export BUN_INSTALL="$HOME/.bun"'
   'export PATH="$BUN_INSTALL/bin:$PATH"'
+  'export GOPATH="$HOME/.go"'
+  'export PATH="$GOPATH/bin:$PATH"'
 )
 for p in "${PATH_EXPORTS[@]}"; do
   if ! grep -qF "$p" "$ZSHRC" 2>/dev/null; then

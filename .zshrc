@@ -6,14 +6,17 @@ if [[ -d /home/linuxbrew/.linuxbrew ]]; then
 fi
 
 # PATH exports
+if [[ ":$FPATH:" != *":/home/aj/.config/zsh/completions:"* ]]; then export FPATH="/home/aj/.config/zsh/completions:$FPATH"; fi
+export GOPATH="$HOME/.go"
+export NVM_DIR="$HOME/.nvm"
+export PNPM_HOME="$HOME/.local/share/pnpm"
+export BUN_INSTALL="$HOME/.bun"
 export PATH=$HOME/.opencode/bin:$PATH
 export PATH=$HOME/.local/bin:$PATH
 export PATH=$HOME/.cargo/bin:$PATH
-export NVM_DIR="$HOME/.nvm"
-export PNPM_HOME="$HOME/.local/share/pnpm"
 export PATH="$PNPM_HOME:$PATH"
-export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
+export PATH="$GOPATH/bin:$PATH"
 
 # Zinit
 source $HOME/.local/share/zinit/zinit.git/zinit.zsh
@@ -51,3 +54,12 @@ zinit light-mode for \
     zdharma-continuum/zinit-annex-bin-gem-node \
     zdharma-continuum/zinit-annex-patch-dl \
     zdharma-continuum/zinit-annex-rust
+
+# pnpm
+export PNPM_HOME="/home/aj/.local/share/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME/bin:"*) ;;
+  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
+esac
+# pnpm end
+. "/home/aj/.deno/env"
