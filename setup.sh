@@ -144,7 +144,7 @@ mkdir -p "$HOME/.go"
 # ---------------------------------------------------------------------------
 step "Starship"
 if ! command -v starship &>/dev/null; then
-  if [[ "$DISTRO" == "opensuse" ]]; then
+  if [[ "$DISTRO" == "opensuse" || "$DISTRO" == "fedora" ]]; then
     curl -sS https://starship.rs/install.sh | sh -s -- --yes
   else
     pkg_install starship
