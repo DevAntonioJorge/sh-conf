@@ -19,26 +19,25 @@ step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
 # ---------------------------------------------------------------------------
 # Distro detection & package manager abstraction
 # ---------------------------------------------------------------------------
-PKG_MGR=""
 DISTRO=""
-SUDO_PASSWORD=""
+SUDO_KEEPALIVE_PID=""
 
 detect_distro() {
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
     case "$ID" in
-      opensuse-tumbleweed|opensuse) DISTRO="opensuse"; PKG_MGR="zypper install -y" ;;
-      arch)                         DISTRO="arch";     PKG_MGR="pacman -S --noconfirm" ;;
-      fedora)                       DISTRO="fedora";   PKG_MGR="dnf install -y" ;;
-      *)                            DISTRO="generic";  PKG_MGR="" ;;
+      opensuse-tumbleweed|opensuse) DISTRO="opensuse" ;;
+      arch)                         DISTRO="arch" ;;
+      fedora)                       DISTRO="fedora" ;;
+      *)                            DISTRO="generic" ;;
     esac
   else
-    DISTRO="generic"; PKG_MGR=""
+    DISTRO="generic"
   fi
 }
 
 
-prompt_sudo_password() {
+ensure_sudo_session() {
   if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
     return
   fi
@@ -47,20 +46,33 @@ prompt_sudo_password() {
     err "sudo is required on $DISTRO, but it was not found."
   fi
 
-  if [[ -n "$SUDO_PASSWORD" ]]; then
-    return
-  fi
-
-  read -rsp "Enter sudo password: " SUDO_PASSWORD
-  echo ""
-  if [[ -z "$SUDO_PASSWORD" ]]; then
-    err "Sudo password is required."
-  fi
-
-  if ! printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -v >/dev/null 2>&1; then
+  if ! sudo -v; then
     err "Invalid sudo password."
   fi
   info "Sudo authentication validated"
+}
+
+start_sudo_keepalive() {
+  if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
+    return
+  fi
+
+  if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
+    return
+  fi
+
+  while true; do
+    sudo -n true >/dev/null 2>&1 || exit
+    sleep 60
+    kill -0 "$$" >/dev/null 2>&1 || exit
+  done &
+  SUDO_KEEPALIVE_PID=$!
+}
+
+stop_sudo_keepalive() {
+  if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
+    kill "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
+  fi
 }
 
 sudo_run() {
@@ -69,15 +81,18 @@ sudo_run() {
     return
   fi
 
-  prompt_sudo_password
-  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' "$@"
+  sudo "$@"
 }
 
 pkg_install() {
   if [[ "$DISTRO" == "generic" ]]; then
     brew install "$@" 2>/dev/null || warn "Some packages may not have installed"
   else
-    sudo_run $PKG_MGR "$@"
+    case "$DISTRO" in
+      opensuse) sudo_run zypper install -y "$@" ;;
+      arch)     sudo_run pacman -S --noconfirm "$@" ;;
+      fedora)   sudo_run dnf install -y "$@" ;;
+    esac
   fi
 }
 
@@ -97,7 +112,9 @@ info "Detected distro: $DISTRO"
 
 if [[ "$DISTRO" != "generic" && $EUID -ne 0 ]]; then
   step "Sudo authentication"
-  prompt_sudo_password
+  ensure_sudo_session
+  start_sudo_keepalive
+  trap stop_sudo_keepalive EXIT
 fi
 
 # ---------------------------------------------------------------------------
@@ -187,12 +204,12 @@ mkdir -p "$HOME/.go"
 step "Starship"
 if ! command -v starship &>/dev/null; then
   if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
-    curl -sS https://starship.rs/install.sh | sh -s -- --yes
+    curl -sS https://starship.rs/install.sh | bash -s -- --yes
   else
     STARSHIP_INSTALLER="$(mktemp /tmp/starship-install.XXXXXX.sh)"
     curl -fsSL https://starship.rs/install.sh -o "$STARSHIP_INSTALLER"
     chmod +x "$STARSHIP_INSTALLER"
-    if ! sudo_run sh "$STARSHIP_INSTALLER" --yes; then
+    if ! sudo_run bash "$STARSHIP_INSTALLER" --yes; then
       rm -f "$STARSHIP_INSTALLER"
       err "Starship installation failed."
     fi
