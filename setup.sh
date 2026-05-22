@@ -300,6 +300,12 @@ else
   info "NVM already installed"
 fi
 
+NOUNSET_WAS_SET=0
+if [[ -o nounset ]]; then
+  NOUNSET_WAS_SET=1
+  set +u
+fi
+
 export NVM_DIR="$HOME/.nvm"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   \. "$NVM_DIR/nvm.sh"
@@ -319,6 +325,10 @@ if ! command -v corepack &>/dev/null; then
   warn "corepack not found in active Node, installing via npm"
   npm install -g corepack || err "Failed to install corepack with npm"
   command -v corepack &>/dev/null || err "corepack is still unavailable after npm installation"
+fi
+
+if [[ "$NOUNSET_WAS_SET" -eq 1 ]]; then
+  set -u
 fi
 
 # ---------------------------------------------------------------------------
