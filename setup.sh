@@ -20,8 +20,8 @@ step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
 # Distro detection & package manager abstraction
 # ---------------------------------------------------------------------------
 PKG_MGR=""
-DISTRO="generic"
-:
+DISTRO=""
+
 detect_distro() {
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
