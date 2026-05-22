@@ -20,21 +20,7 @@ step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
 # Distro detection & package manager abstraction
 # ---------------------------------------------------------------------------
 PKG_MGR=""
-DISTRO=""
-
-detect_distro() {
-  if [[ -f /etc/os-release ]]; then
-    source /etc/os-release
-    case "$ID" in
-      opensuse-tumbleweed|opensuse) DISTRO="opensuse"; PKG_MGR="sudo zypper install -y" ;;
-      arch)                         DISTRO="arch";     PKG_MGR="sudo pacman -S --noconfirm" ;;
-      fedora)                       DISTRO="fedora";   PKG_MGR="sudo dnf install -y" ;;
-      *)                            DISTRO="generic";  PKG_MGR="" ;;
-    esac
-  else
-    DISTRO="generic"; PKG_MGR=""
-  fi
-}
+DISTRO="generic"
 
 
 pkg_install() {
