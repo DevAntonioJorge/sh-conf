@@ -64,7 +64,10 @@ start_sudo_keepalive() {
   local parent_pid="$$"
   while true; do
     kill -0 "$parent_pid" >/dev/null 2>&1 || exit
-    sudo -n true >/dev/null 2>&1 || exit
+    if ! sudo -n true >/dev/null 2>&1; then
+      warn "Sudo credentials expired; a new prompt may appear on the next privileged command."
+      exit
+    fi
     sleep 60
   done &
   SUDO_KEEPALIVE_PID=$!
@@ -73,6 +76,7 @@ start_sudo_keepalive() {
 stop_sudo_keepalive() {
   if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
     kill "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
+    SUDO_KEEPALIVE_PID=""
   fi
 }
 
@@ -234,11 +238,11 @@ fi
 # ---------------------------------------------------------------------------
 if [[ "$DISTRO" == "fedora" ]]; then
   step "Atuin prerequisites (Fedora)"
-  if ! command -v awk &>/dev/null && ! command -v gawk &>/dev/null; then
-    info "awk/gawk not found, installing gawk..."
+  if ! command -v awk &>/dev/null; then
+    info "awk not found, installing gawk..."
     pkg_install gawk
   else
-    info "awk/gawk already available"
+    info "awk already available"
   fi
 fi
 
