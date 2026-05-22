@@ -320,8 +320,8 @@ fi
 
 if ! nvm use --lts >/dev/null 2>&1; then
   info "Node LTS is not available in nvm yet, installing latest LTS"
-  nvm install --lts >/dev/null 2>&1 || err "Failed to install Node LTS with nvm. Check internet access and run: nvm install --lts"
-  nvm use --lts >/dev/null 2>&1 || err "Failed to activate Node LTS with nvm. Try: nvm install --lts"
+  nvm install --lts >/dev/null 2>&1 || err "Failed to install Node LTS with nvm. Check internet access, ensure nvm is sourced, then run: nvm install --lts"
+  nvm use --lts >/dev/null 2>&1 || err "Installed Node LTS but failed to activate it. Reload your shell and run: nvm use --lts"
 fi
 
 if ! command -v corepack &>/dev/null; then
