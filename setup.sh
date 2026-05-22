@@ -225,12 +225,13 @@ if ! command -v node &>/dev/null; then
   nvm install --lts
 fi
 if ! nvm use --lts >/dev/null; then
-  err "Failed to activate Node LTS with nvm"
+  err "Failed to activate Node LTS with nvm. Try: nvm install --lts"
 fi
 
 if ! command -v corepack &>/dev/null; then
   warn "corepack not found in active Node, installing via npm"
-  npm install -g corepack
+  npm install -g corepack || err "Failed to install corepack with npm"
+  command -v corepack &>/dev/null || err "corepack is still unavailable after npm installation"
 fi
 
 # ---------------------------------------------------------------------------
