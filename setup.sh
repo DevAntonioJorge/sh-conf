@@ -21,14 +21,15 @@ step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
 # ---------------------------------------------------------------------------
 PKG_MGR=""
 DISTRO=""
+SUDO_PASSWORD=""
 
 detect_distro() {
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
     case "$ID" in
-      opensuse-tumbleweed|opensuse) DISTRO="opensuse"; PKG_MGR="sudo zypper install -y" ;;
-      arch)                         DISTRO="arch";     PKG_MGR="sudo pacman -S --noconfirm" ;;
-      fedora)                       DISTRO="fedora";   PKG_MGR="sudo dnf install -y" ;;
+      opensuse-tumbleweed|opensuse) DISTRO="opensuse"; PKG_MGR="zypper install -y" ;;
+      arch)                         DISTRO="arch";     PKG_MGR="pacman -S --noconfirm" ;;
+      fedora)                       DISTRO="fedora";   PKG_MGR="dnf install -y" ;;
       *)                            DISTRO="generic";  PKG_MGR="" ;;
     esac
   else
@@ -37,11 +38,46 @@ detect_distro() {
 }
 
 
+prompt_sudo_password() {
+  if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
+    return
+  fi
+
+  if ! command -v sudo &>/dev/null; then
+    err "sudo is required on $DISTRO, but it was not found."
+  fi
+
+  if [[ -n "$SUDO_PASSWORD" ]]; then
+    return
+  fi
+
+  read -rsp "Enter sudo password: " SUDO_PASSWORD
+  echo ""
+  if [[ -z "$SUDO_PASSWORD" ]]; then
+    err "Sudo password is required."
+  fi
+
+  if ! printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' -v >/dev/null 2>&1; then
+    err "Invalid sudo password."
+  fi
+  info "Sudo authentication validated"
+}
+
+sudo_run() {
+  if [[ $EUID -eq 0 ]]; then
+    "$@"
+    return
+  fi
+
+  prompt_sudo_password
+  printf '%s\n' "$SUDO_PASSWORD" | sudo -S -p '' "$@"
+}
+
 pkg_install() {
   if [[ "$DISTRO" == "generic" ]]; then
     brew install "$@" 2>/dev/null || warn "Some packages may not have installed"
   else
-    $PKG_MGR "$@"
+    sudo_run $PKG_MGR "$@"
   fi
 }
 
@@ -58,6 +94,11 @@ is_installed() {
 
 detect_distro
 info "Detected distro: $DISTRO"
+
+if [[ "$DISTRO" != "generic" && $EUID -ne 0 ]]; then
+  step "Sudo authentication"
+  prompt_sudo_password
+fi
 
 # ---------------------------------------------------------------------------
 # Check required archive utility
@@ -145,7 +186,18 @@ mkdir -p "$HOME/.go"
 # ---------------------------------------------------------------------------
 step "Starship"
 if ! command -v starship &>/dev/null; then
+  if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
     curl -sS https://starship.rs/install.sh | sh -s -- --yes
+  else
+    STARSHIP_INSTALLER="$(mktemp /tmp/starship-install.XXXXXX.sh)"
+    curl -fsSL https://starship.rs/install.sh -o "$STARSHIP_INSTALLER"
+    chmod +x "$STARSHIP_INSTALLER"
+    if ! sudo_run sh "$STARSHIP_INSTALLER" --yes; then
+      rm -f "$STARSHIP_INSTALLER"
+      err "Starship installation failed."
+    fi
+    rm -f "$STARSHIP_INSTALLER"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -159,6 +211,16 @@ fi
 # ---------------------------------------------------------------------------
 # 5. Atuin (shell history)
 # ---------------------------------------------------------------------------
+if [[ "$DISTRO" == "fedora" ]]; then
+  step "Atuin prerequisites (Fedora)"
+  if ! command -v awk &>/dev/null && ! command -v gawk &>/dev/null; then
+    info "awk/gawk not found, installing gawk..."
+    pkg_install gawk
+  else
+    info "awk/gawk already available"
+  fi
+fi
+
 step "Atuin"
 if [[ ! -d "$HOME/.atuin" ]]; then
   curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh -s -- --non-interactive
