@@ -300,9 +300,9 @@ else
   info "NVM already installed"
 fi
 
-NOUNSET_WAS_SET=0
+RESTORE_NOUNSET=0
 if [[ -o nounset ]]; then
-  NOUNSET_WAS_SET=1
+  RESTORE_NOUNSET=1
   set +u
 fi
 
@@ -327,7 +327,7 @@ if ! command -v corepack &>/dev/null; then
   command -v corepack &>/dev/null || err "corepack is still unavailable after npm installation"
 fi
 
-if [[ "$NOUNSET_WAS_SET" -eq 1 ]]; then
+if [[ "$RESTORE_NOUNSET" -eq 1 ]]; then
   set -u
 fi
 
