@@ -313,11 +313,6 @@ else
   err "NVM was not loaded correctly from $NVM_DIR/nvm.sh"
 fi
 
-if ! command -v node &>/dev/null; then
-  info "Node not found, installing latest LTS with nvm"
-  nvm install --lts
-fi
-
 if ! nvm use --lts >/dev/null 2>&1; then
   info "Node LTS is not available in nvm yet, installing latest LTS"
   nvm install --lts || err "Failed to install Node LTS with nvm. Check your nvm setup, network access, and any nvm mirror settings"
