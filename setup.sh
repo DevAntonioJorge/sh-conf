@@ -19,29 +19,85 @@ step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
 # ---------------------------------------------------------------------------
 # Distro detection & package manager abstraction
 # ---------------------------------------------------------------------------
-PKG_MGR=""
 DISTRO=""
+SUDO_KEEPALIVE_PID=""
 
 detect_distro() {
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
     case "$ID" in
-      opensuse-tumbleweed|opensuse) DISTRO="opensuse"; PKG_MGR="sudo zypper install -y" ;;
-      arch)                         DISTRO="arch";     PKG_MGR="sudo pacman -S --noconfirm" ;;
-      fedora)                       DISTRO="fedora";   PKG_MGR="sudo dnf install -y" ;;
-      *)                            DISTRO="generic";  PKG_MGR="" ;;
+      opensuse-tumbleweed|opensuse) DISTRO="opensuse" ;;
+      arch)                         DISTRO="arch" ;;
+      fedora)                       DISTRO="fedora" ;;
+      *)                            DISTRO="generic" ;;
     esac
   else
-    DISTRO="generic"; PKG_MGR=""
+    DISTRO="generic"
   fi
 }
 
+
+ensure_sudo_session() {
+  if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
+    return
+  fi
+
+  if ! command -v sudo &>/dev/null; then
+    err "sudo is required on $DISTRO, but it was not found."
+  fi
+
+  if ! sudo -v; then
+    err "Invalid sudo password."
+  fi
+  info "Sudo authentication validated"
+}
+
+start_sudo_keepalive() {
+  if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
+    return
+  fi
+
+  if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
+    return
+  fi
+
+  local parent_pid="$$"
+  while true; do
+    kill -0 "$parent_pid" >/dev/null 2>&1 || exit
+    if ! sudo -n true >/dev/null 2>&1; then
+      warn "Sudo credentials expired; a new prompt may appear on the next privileged command."
+      exit
+    fi
+    sleep 60
+  done &
+  SUDO_KEEPALIVE_PID=$!
+}
+
+stop_sudo_keepalive() {
+  if [[ -n "$SUDO_KEEPALIVE_PID" ]]; then
+    kill "$SUDO_KEEPALIVE_PID" >/dev/null 2>&1 || true
+    SUDO_KEEPALIVE_PID=""
+  fi
+}
+
+sudo_run() {
+  if [[ $EUID -eq 0 ]]; then
+    "$@"
+    return
+  fi
+
+  sudo "$@"
+}
 
 pkg_install() {
   if [[ "$DISTRO" == "generic" ]]; then
     brew install "$@" 2>/dev/null || warn "Some packages may not have installed"
   else
-    $PKG_MGR "$@"
+    case "$DISTRO" in
+      opensuse) sudo_run zypper install -y "$@" ;;
+      arch)     sudo_run pacman -S --noconfirm "$@" ;;
+      fedora)   sudo_run dnf install -y "$@" ;;
+    esac
   fi
 }
 
@@ -58,6 +114,13 @@ is_installed() {
 
 detect_distro
 info "Detected distro: $DISTRO"
+
+if [[ "$DISTRO" != "generic" && $EUID -ne 0 ]]; then
+  step "Sudo authentication"
+  ensure_sudo_session
+  start_sudo_keepalive
+  trap stop_sudo_keepalive EXIT
+fi
 
 # ---------------------------------------------------------------------------
 # Check required archive utility
@@ -145,7 +208,21 @@ mkdir -p "$HOME/.go"
 # ---------------------------------------------------------------------------
 step "Starship"
 if ! command -v starship &>/dev/null; then
-    curl -sS https://starship.rs/install.sh | sh -s -- --yes
+  STARSHIP_INSTALLER="$(mktemp /tmp/starship-install.XXXXXX.sh)"
+  curl -fsSL https://starship.rs/install.sh -o "$STARSHIP_INSTALLER"
+  chmod +x "$STARSHIP_INSTALLER"
+
+  STARSHIP_INSTALL_FAILED=0
+  if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
+    bash "$STARSHIP_INSTALLER" --yes || STARSHIP_INSTALL_FAILED=1
+  else
+    sudo_run bash "$STARSHIP_INSTALLER" --yes || STARSHIP_INSTALL_FAILED=1
+  fi
+
+  rm -f "$STARSHIP_INSTALLER"
+  if [[ "$STARSHIP_INSTALL_FAILED" -ne 0 ]]; then
+    err "Starship installation failed."
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -159,6 +236,16 @@ fi
 # ---------------------------------------------------------------------------
 # 5. Atuin (shell history)
 # ---------------------------------------------------------------------------
+if [[ "$DISTRO" == "fedora" ]]; then
+  step "Atuin prerequisites (Fedora)"
+  if ! command -v awk &>/dev/null; then
+    info "awk not found, installing gawk..."
+    pkg_install gawk
+  else
+    info "awk already available"
+  fi
+fi
+
 step "Atuin"
 if [[ ! -d "$HOME/.atuin" ]]; then
   curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh -s -- --non-interactive
