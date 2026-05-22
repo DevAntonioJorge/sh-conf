@@ -221,9 +221,12 @@ else
 fi
 
 if ! command -v node &>/dev/null; then
+  info "Node not found, installing latest LTS with nvm"
   nvm install --lts
 fi
-nvm use --lts >/dev/null
+if ! nvm use --lts >/dev/null; then
+  err "Failed to activate Node LTS with nvm"
+fi
 
 if ! command -v corepack &>/dev/null; then
   warn "corepack not found in active Node, installing via npm"
@@ -235,7 +238,6 @@ fi
 # ---------------------------------------------------------------------------
 step "pnpm"
 if ! command -v pnpm &>/dev/null; then
-  command -v corepack &>/dev/null || err "corepack is required to install pnpm and is not available"
   corepack enable
   corepack prepare pnpm@latest --activate
 else
