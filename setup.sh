@@ -320,7 +320,7 @@ fi
 
 if ! nvm use --lts >/dev/null 2>&1; then
   info "Node LTS is not available in nvm yet, installing latest LTS"
-  nvm install --lts >/dev/null 2>&1 || err "Failed to install Node LTS with nvm"
+  nvm install --lts >/dev/null 2>&1 || err "Failed to install Node LTS with nvm. Check internet access and run: nvm install --lts"
   nvm use --lts >/dev/null 2>&1 || err "Failed to activate Node LTS with nvm. Try: nvm install --lts"
 fi
 
