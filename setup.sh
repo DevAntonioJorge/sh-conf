@@ -21,7 +21,7 @@ step()  { echo -e "\n\033[1m==> \033[0m\033[1;36m$1\033[0m"; }
 # ---------------------------------------------------------------------------
 PKG_MGR=""
 DISTRO="generic"
-:'
+:
 detect_distro() {
   if [[ -f /etc/os-release ]]; then
     source /etc/os-release
@@ -35,7 +35,7 @@ detect_distro() {
     DISTRO="generic"; PKG_MGR=""
   fi
 }
-'
+
 
 pkg_install() {
   if [[ "$DISTRO" == "generic" ]]; then
@@ -145,14 +145,7 @@ mkdir -p "$HOME/.go"
 # ---------------------------------------------------------------------------
 step "Starship"
 if ! command -v starship &>/dev/null; then
-  if [[ "$DISTRO" == "opensuse" || "$DISTRO" == "fedora" ]]; then
     curl -sS https://starship.rs/install.sh | sh -s -- --yes
-  else
-    pkg_install starship
-  fi
-  info "Starship installed"
-else
-  info "Starship already installed"
 fi
 
 # ---------------------------------------------------------------------------
@@ -160,14 +153,7 @@ fi
 # ---------------------------------------------------------------------------
 step "Mise"
 if ! command -v mise &>/dev/null; then
-  if [[ "$DISTRO" == "opensuse" ]]; then
     curl https://mise.run | sh
-  else
-    pkg_install mise
-  fi
-  info "Mise installed"
-else
-  info "Mise already installed"
 fi
 
 # ---------------------------------------------------------------------------
