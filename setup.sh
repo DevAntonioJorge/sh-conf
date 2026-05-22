@@ -61,10 +61,11 @@ start_sudo_keepalive() {
     return
   fi
 
+  local parent_pid="$$"
   while true; do
     sudo -n true >/dev/null 2>&1 || exit
     sleep 60
-    kill -0 "$$" >/dev/null 2>&1 || exit
+    kill -0 "$parent_pid" >/dev/null 2>&1 || exit
   done &
   SUDO_KEEPALIVE_PID=$!
 }
@@ -203,18 +204,21 @@ mkdir -p "$HOME/.go"
 # ---------------------------------------------------------------------------
 step "Starship"
 if ! command -v starship &>/dev/null; then
+  STARSHIP_INSTALLER="$(mktemp /tmp/starship-install.XXXXXX.sh)"
+  curl -fsSL https://starship.rs/install.sh -o "$STARSHIP_INSTALLER"
+  chmod +x "$STARSHIP_INSTALLER"
   if [[ "$DISTRO" == "generic" || $EUID -eq 0 ]]; then
-    curl -sS https://starship.rs/install.sh | bash -s -- --yes
+    if ! bash "$STARSHIP_INSTALLER" --yes; then
+      rm -f "$STARSHIP_INSTALLER"
+      err "Starship installation failed."
+    fi
   else
-    STARSHIP_INSTALLER="$(mktemp /tmp/starship-install.XXXXXX.sh)"
-    curl -fsSL https://starship.rs/install.sh -o "$STARSHIP_INSTALLER"
-    chmod +x "$STARSHIP_INSTALLER"
     if ! sudo_run bash "$STARSHIP_INSTALLER" --yes; then
       rm -f "$STARSHIP_INSTALLER"
       err "Starship installation failed."
     fi
-    rm -f "$STARSHIP_INSTALLER"
   fi
+  rm -f "$STARSHIP_INSTALLER"
 fi
 
 # ---------------------------------------------------------------------------
