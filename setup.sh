@@ -313,12 +313,10 @@ else
   err "NVM was not loaded correctly from $NVM_DIR/nvm.sh"
 fi
 
-if ! command -v node &>/dev/null; then
-  info "Node not found, installing latest LTS with nvm"
-  nvm install --lts
-fi
-if ! nvm use --lts >/dev/null; then
-  err "Failed to activate Node LTS with nvm. Try: nvm install --lts"
+if ! nvm use --lts >/dev/null 2>&1; then
+  info "Node LTS is not available in nvm yet, installing latest LTS"
+  nvm install --lts || err "Failed to install Node LTS with nvm. Check your nvm setup, network access, and any nvm mirror settings"
+  nvm use --lts >/dev/null 2>&1 || err "Installed Node LTS but failed to activate it. Check installed versions with: nvm ls"
 fi
 
 if ! command -v corepack &>/dev/null; then
