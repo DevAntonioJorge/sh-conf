@@ -209,10 +209,29 @@ fi
 step "NVM"
 if [[ ! -d "$HOME/.nvm" ]]; then
   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 else
   info "NVM already installed"
+fi
+
+export NVM_DIR="$HOME/.nvm"
+if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+  \. "$NVM_DIR/nvm.sh"
+else
+  err "NVM was not loaded correctly from $NVM_DIR/nvm.sh"
+fi
+
+if ! command -v node &>/dev/null; then
+  info "Node not found, installing latest LTS with nvm"
+  nvm install --lts
+fi
+if ! nvm use --lts >/dev/null; then
+  err "Failed to activate Node LTS with nvm. Try: nvm install --lts"
+fi
+
+if ! command -v corepack &>/dev/null; then
+  warn "corepack not found in active Node, installing via npm"
+  npm install -g corepack || err "Failed to install corepack with npm"
+  command -v corepack &>/dev/null || err "corepack is still unavailable after npm installation"
 fi
 
 # ---------------------------------------------------------------------------
